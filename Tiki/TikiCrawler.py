@@ -101,6 +101,7 @@ def get_guarantee():
 
 #Get detailed information of product
 def get_details():
+    check_sku = False
     prop = []
     if hasXpath("//tbody"):
         table = driver.find_element_by_xpath("//tbody")
@@ -110,12 +111,10 @@ def get_details():
             prop.append(rows[cell].text + ": " + rows[cell+1].text)
 
             if (rows[cell].text == "SKU"):
-                items_sku.append(rows[cell+1].text)
-                check = 1
-            else:
-                check = 0
+               items_sku.append(rows[cell+1].text)
+               check_sku = True
         
-        if (check == 0):
+        if (check_sku == False):
             items_sku.append("None") 
 
         items_detail.append(prop)
