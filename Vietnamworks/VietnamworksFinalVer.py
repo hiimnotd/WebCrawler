@@ -2,6 +2,8 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchElementException
+from webdriver_manager.chrome import  ChromeDriverManager
 from bs4 import BeautifulSoup
 import time
 import requests
@@ -30,6 +32,8 @@ notice = 'Information is missed'
 
 
 #Chrome Options
+option = webdriver.ChromeOptions()
+CDM = ChromeDriverManager()
 chrome_options = Options()
 chrome_options.add_argument ('--ignore-certificate-errors')
 chrome_options.add_argument ("--igcognito")
@@ -38,7 +42,7 @@ chrome_options.add_argument ('--headless')
 
 
 #Set path for webdriver
-driver = webdriver.Chrome(chrome_options=chrome_options, executable_path="C:/webdriver/chromedriver.exe")
+driver = webdriver.Chrome(CDM.install(),chrome_options=chrome_options,options=option)
 
 
 #Open log-in url
@@ -56,19 +60,16 @@ driver.find_element_by_id('login__password').send_keys('Conanpro123')         #P
 driver.find_element_by_id("button-login").click()
 
 
-#Open url
+#Crawl all the links of job
 url = 'https://www.vietnamworks.com/tim-viec-lam/tat-ca-viec-lam'
 driver.get(url)
 time.sleep(10)
-# page_source = driver.page_source
-# soup = BeautifulSoup(page_source,"html.parser")
-
 
 page_num = 1
+driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
 
-while page_num <= 80:
-
-    #insert the scraping code to scrape this page
+while page_num <= 40:
+    #crawl all the link and the salary in each page
     page_source = driver.page_source
     soup = BeautifulSoup(page_source,"html.parser")
     block_job_list = soup.find_all("div",{"class":"block-job-list"})
@@ -82,38 +83,30 @@ while page_num <= 80:
             salary = j.find("span")
             all_salary.append(salary.text.replace("\n","").strip())
 
-    #moving to next page
-
-    a = driver.find_elements_by_class_name('page-link')    #Finds the pages list in the bottom of the page
-    time.sleep(1)
-    if page_num ==1:
-        a[2].click()
-        page_num +=1
-
-    elif page_num >=2 and page_num <=4:
-        a[4].click()
+    # moves to next page
+    try:
+        print(f'On page {str(page_num)}')
+        print()
         page_num+=1
+        driver.find_element_by_link_text(str(page_num)).click()
+        time.sleep(3)
 
-    elif page_num >4 and len(a)<7:
-        print('End of page')
+    # checks only at the end of the page
+    except NoSuchElementException:
+        print('End of pages')
         break
 
-    else:
-        print('yes')
-        a[6].click()
-        page_num+=1
-    time.sleep(3)
 driver.quit()
 
 #Remove all duplicates links
-# [all_link_del_duplicates.append(x) for x in all_link if x not in all_link_del_duplicates]
+[all_link_del_duplicates.append(x) for x in all_link if x not in all_link_del_duplicates]
 
-# print("\n".join(all_link_del_duplicates))
-# print(len(all_link_del_duplicates))
+print("\n".join(all_link_del_duplicates))
+print(len(all_link_del_duplicates))
 
 
 #Enter to every links to crawl the data
-for i in all_link:
+for i in all_link_del_duplicates:
     page = requests.get(i)
     soup = BeautifulSoup(page.content,"html.parser")
     name_job.append(soup.find("h1",{"class":"job-title"}).text.replace("\n","").strip())
@@ -121,8 +114,6 @@ for i in all_link:
     name_company.append(soup.find("div",{"class","company-name"}).text.replace("\n","").strip())
 
     name_location.append(soup.find("span",{"class":"company-location"}).text.replace("\n","").strip())
-
-    expiry.append(soup.find("span",{"class":"expiry gray-light"}).text.replace("\n","").strip())
 
     information = soup.find_all("div",{"class":"row summary-item"})
     for i in information:
@@ -181,4 +172,4 @@ data = {
 }
 
 df = pandas.DataFrame(data)
-df.to_excel(r'Vietnamworks.xlsx', index = False)
+df.to_excel(r'Vietnamworks2.xlsx', index = False)
