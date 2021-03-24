@@ -1,7 +1,6 @@
 from bs4 import BeautifulSoup
 import pandas
 import xlsxwriter
-from lxml import html
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.common.exceptions import StaleElementReferenceException
@@ -108,7 +107,7 @@ def get_details():
         rows = table.find_elements_by_xpath(".//tr//td")
 
         for cell in range(0, len(rows), 2):
-            prop.append(rows[cell].text + ": " + rows[cell+1].text)
+            # prop.append(rows[cell].text + ": " + rows[cell+1].text)
 
             if (rows[cell].text == "SKU"):
                items_sku.append(rows[cell+1].text)
@@ -117,9 +116,9 @@ def get_details():
         if (check_sku == False):
             items_sku.append("None") 
 
-        items_detail.append(prop)
+        # items_detail.append(prop)
     else:
-        items_detail.append("None")
+        # items_detail.append("None")
         items_sku.append("None")
         
 
@@ -141,17 +140,20 @@ driver.get(url)
 #Get link to each category of tiki
 #Becasue we need to hover main menu in order to get each category link
 #So I used an ActionChains move_to_element in Selenium to perform like a real user
-element = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.XPATH, "//a[@class='Menu-button']")))
+element = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.XPATH, 
+                                                        "//a[@class='Menu-button']")))
 ActionChains(driver).move_to_element(element).perform()
 cate_link = element.find_elements_by_xpath("//a[@data-view-id='main_navigation_item']")
 for i in cate_link:
-    categories_link.append(i.get_attribute('href'))
+    categories_link.append(i.get_attribute('href').split("?",1)[0])
 
 #Tiki responsed an empty link in Fashion category
 #So I need to implement them manually
 categories_link.pop(10)
 categories_link.append('https://tiki.vn/thoi-trang-nu/c931')
 categories_link.append('https://tiki.vn/thoi-trang-nam/c915')
+
+print(categories_link)
 
 #Get category name to export
 #It is same to getting categories link, I also need to implement categories's names manually
@@ -165,60 +167,64 @@ categories.append("Thời Trang Nam")
 #Create a WebDriverWait (maximum 10 seconds)
 wait = WebDriverWait(driver, 10)
 
-for i in categories_link:
-    #Request to each category
-    driver.get(i)
-    #Get product link to request
-    #Sometimes, DOM operation happening on the page is temporarily causing the element to be inaccessible.
-    #So if this Exception throwed, I let the WebDriver refresh
-    try:  
-        item_in_cate = []
-        get_item_links()
-    except StaleElementReferenceException:
-        driver.refresh()
-        item_in_cate = []
-        get_item_links()
+for i in categories_link: 
+    for k in range(1,6):
+        #Request to each category
+        driver.get(i+"?page="+str(k))
+        #Get product link to request
+        #Sometimes, DOM operation happening on the page is temporarily causing the element to be inaccessible.
+        #So if this exception thrown, I let the WebDriver refresh
 
-    for j in item_in_cate:
-        items_link.append(j)
-
-    for link in item_in_cate:
-        #Set category of each item to export
-        items_category.append(categories[categories_link.index(i)])
-
-        #Request to link of each product
-        driver.get(link)
-
-        #If I request to Tiki's server to much, it will block me from accessing to Tiki
-        #The solution is that I refresh WebDriver again
-        #Need an Explicit Wait for price elements located
-        #Also need an Implicitly Wait (about 0.5s) for all elements that i need from webpage to load
-        try:
-            wait.until(EC.visibility_of_all_elements_located((By.XPATH,"//span[@class='list-price'] | //span[@class='product-price__current-price']")))
-            driver.implicitly_wait(0.5)
-        except TimeoutException:
+        try:  
+            item_in_cate = []
+            get_item_links()
+        except StaleElementReferenceException:
             driver.refresh()
-            wait.until(EC.visibility_of_all_elements_located((By.XPATH,"//span[@class='list-price'] | //span[@class='product-price__current-price']")))
-            driver.implicitly_wait(0.5)
+            item_in_cate = []
+            get_item_links()
 
-        #Get products's names
-        items_name.append(driver.find_element_by_xpath("//h1[@class='title']").text)
+        for j in item_in_cate:
+            items_link.append(j)
 
-        #Check if the product has Flash sale, Sale or not
-        #Get price in each case by using functions were defined
-        if hasFlashSale():  
-            get_FlashSalePrice()
-        else: 
-            if hasXpath("//div[@class='product-price']//span[@class='product-price__list-price']"):
-                get_SalePrice()
-            else:
-                get_NormalPrice()
+        for link in item_in_cate:
+            #Set category of each item to export
+            items_category.append(categories[categories_link.index(i)])
 
-        #Get Brand(or Author), Options, Guarantee time and Detailed information of product
-        get_Brand()
-        get_Options()
-        get_guarantee()
-        get_details()
+            #Request to link of each product
+            driver.get(link)
+
+            #If I request to Tiki's server to much, it will block me from accessing to Tiki
+            #The solution is that I refresh WebDriver again
+            #Need an Explicit Wait for price elements located
+            #Also need an Implicitly Wait (about 0.5s) for all elements that i need from webpage to load
+            try:
+                wait.until(EC.visibility_of_all_elements_located((By.XPATH,
+                    "//span[@class='list-price'] | //span[@class='product-price__current-price']")))
+                driver.implicitly_wait(0.5)
+            except TimeoutException:
+                driver.refresh()
+                wait.until(EC.visibility_of_all_elements_located((By.XPATH,
+                    "//span[@class='list-price'] | //span[@class='product-price__current-price']")))
+                driver.implicitly_wait(0.5)
+
+            #Get products's names
+            items_name.append(driver.find_element_by_xpath("//h1[@class='title']").text)
+
+            #Check if the product has Flash sale, Sale or not
+            #Get price in each case by using functions were defined
+            if hasFlashSale():  
+                get_FlashSalePrice()
+            else: 
+                if hasXpath("//div[@class='product-price']//span[@class='product-price__list-price']"):
+                    get_SalePrice()
+                else:
+                    get_NormalPrice()
+
+            #Get Brand(or Author), Options, Guarantee time and Detailed information of product
+            get_Brand()
+            get_Options()
+            get_guarantee()
+            get_details()   
         
 #Turn off WebDriver after finishing scarb
 driver.quit()
@@ -234,13 +240,13 @@ data = {
     "Discount Rate" : items_discount_rate,
     "Options" : items_option,
     "Guarantee" : items_guarantee,
-    "SKU": items_sku,
-    "Details" : items_detail
-}
+    "SKU": items_sku
+#     "Details" : items_detail
+ }
 
 df = pandas.DataFrame(data)
 
-writer = pandas.ExcelWriter('Tiki.xlsx', engine='xlsxwriter')
+writer = pandas.ExcelWriter('Tiki1.xlsx', engine='xlsxwriter')
 
 #Write data to Sheet1 of excel file
 df.to_excel(writer, sheet_name='Sheet1', index=False)       
